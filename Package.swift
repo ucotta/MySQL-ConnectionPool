@@ -1,21 +1,20 @@
 import PackageDescription
 
+
+let urls = ["https://github.com/PerfectlySoft/Perfect-Thread.git]
+
 #if os(OSX)
-let package = Package(
-    name: "PerfectMySQLConnectionPool"
-    targets: [],
-    dependencies: [
-		.Package(url: "https://github.com/PerfectlySoft/Perfect-mysqlclient.git", majorVersion: 2, minor: 0)
-    ],
-    exclude: []
-)
+urls += ["https://github.com/PerfectlySoft/Perfect-mysqlclient.git"]
 #else
-let package = Package(
-    name: "PerfectMySQLConnectionPool"
-    targets: [],
-    dependencies: [
-		.Package(url: "https://github.com/PerfectlySoft/Perfect-mysqlclient-Linux.git", majorVersion: 2, minor: 0)
-    ],
-    exclude: []
-)
+urls += ["https://github.com/PerfectlySoft/Perfect-mysqlclient-Linux.git"]
 #endif
+
+let package = Package(
+	name: "PerfectMySQLConnectionPool",
+	targets: [],
+	dependencies: urls.map { .Package(url: $0, majorVersion: 2, minor: 0) },
+	exclude: []
+)
+
+
+

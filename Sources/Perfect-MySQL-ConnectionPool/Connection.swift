@@ -37,6 +37,10 @@ public class Connection: Equatable {
 		mysql.close()
 	}
 
+	public func returnToPool() {
+		ConnectionPool.sharedInstance.returnConnection(conn: self)
+	}
+
 	deinit {
 		print("DEINIT")
 		mysql.close()
@@ -54,8 +58,6 @@ public class Connection: Equatable {
 	private func addParams(_ stmt: MySQLStmt, args:[Any]) throws {
 		var i = 0
 		for item in args {
-			print("\(i) = \(item)")
-			i += 1
 			switch item {
 			case let val as Int:
 				stmt.bindParam(val)
@@ -72,8 +74,9 @@ public class Connection: Equatable {
 				//case let val as DateTime:
 			//    stmt.bindParam(fromDate:val)
 			default:
-				throw MySQLError.notSupportedType(parameter: item)
+				throw ConnectionError.fieldTypeNotSupported(fieldRow: i, fieldData: item)
 			}
+			i += 1
 		}
 
 	}
@@ -82,7 +85,26 @@ public class Connection: Equatable {
 		lastError = (0, "")
 	}
 
-	public func queryRow(_ query:String, args:Any...) throws -> Array<Optional<Any>>? {
+	public func queryRow(_ query: String) throws -> Array<Optional<Any>>? {
+		resetError()
+
+		if mysql.query(statement: query) {
+			if let results = mysql.storeResults() {
+				//setup an array to store results
+				defer { results.close() }
+				if let row = results.next() {
+					return row
+				}
+			}
+		} else {
+			lastError = (Int(mysql.errorCode()), "Cannot create query  \(mysql.errorCode()) \(mysql.errorMessage())")
+			throw ConnectionError.errorPrepareQuery(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+
+		return nil
+	}
+
+	public func queryRow(_ query: String, args: Any...) throws -> Array<Optional<Any>>? {
 		resetError()
 
 		let stmt:MySQLStmt = MySQLStmt(mysql)
@@ -90,14 +112,14 @@ public class Connection: Equatable {
 
 		guard stmt.prepare(statement: query) else {
 			lastError = (Int(stmt.errorCode()), "Cannot create statement  \(stmt.errorCode()) \(stmt.errorMessage())")
-			throw MySQLError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+			throw ConnectionError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
 
 		try addParams(stmt, args: args)
 
 		if !stmt.execute() {
 			lastError = (Int(stmt.errorCode()), "Cannot execute statement  \(stmt.errorCode()) \(stmt.errorMessage())")
-			throw MySQLError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
 		let datos = stmt.results()
 		defer { stmt.freeResult() }
@@ -114,7 +136,24 @@ public class Connection: Equatable {
 		return result
 	}
 
-	public func queryAll(query:String, args:Any..., closure: (_ row:  Array<Optional<Any>>)->()) throws {
+	public func queryAll(_ query:String, closure: (_ row:  Array<Optional<Any>>)->()) throws {
+		resetError()
+
+		if mysql.query(statement: query) {
+			if let results = mysql.storeResults() {
+				//setup an array to store results
+				defer { results.close() }
+				while let row = results.next() {
+					closure(row)
+				}
+			}
+		} else {
+			lastError = (Int(mysql.errorCode()), "Cannot create query  \(mysql.errorCode()) \(mysql.errorMessage())")
+			throw ConnectionError.errorPrepareQuery(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+	}
+
+	public func queryAll(_ query:String, args:Any..., closure: (_ row:  Array<Optional<Any>>)->()) throws {
 		resetError()
 
 		let stmt:MySQLStmt = MySQLStmt(mysql)
@@ -122,13 +161,13 @@ public class Connection: Equatable {
 
 		guard stmt.prepare(statement: query) else {
 			lastError = (Int(stmt.errorCode()), "Cannot create statement \(stmt.errorCode()) \(stmt.errorMessage())")
-			throw MySQLError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+			throw ConnectionError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
 
 		try addParams(stmt, args: args)
 
 		if !stmt.execute() {
-			throw MySQLError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
 		let datos = stmt.results()
 		defer { stmt.freeResult() }
@@ -138,6 +177,33 @@ public class Connection: Equatable {
 			closure(row)
 		}
 	}
+
+	public func execute(_ query:String) throws {
+		if !mysql.query(statement: query) {
+			lastError = (Int(mysql.errorCode()), "Cannot create query  \(mysql.errorCode()) \(mysql.errorMessage())")
+			throw ConnectionError.errorPrepareQuery(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+	}
+
+	public func execute(_ query:String, args:Any...) throws {
+		resetError()
+
+		
+		let stmt:MySQLStmt = MySQLStmt(mysql)
+		defer { stmt.close() }
+
+		guard stmt.prepare(statement: query) else {
+			lastError = (Int(stmt.errorCode()), "Cannot create statement \(stmt.errorCode()) \(stmt.errorMessage())")
+			throw ConnectionError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+
+		try addParams(stmt, args: args)
+
+		if !stmt.execute() {
+			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+	}
+
 
 }
 

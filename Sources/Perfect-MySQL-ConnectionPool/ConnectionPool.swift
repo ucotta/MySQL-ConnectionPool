@@ -9,8 +9,8 @@ import Foundation
 import MySQL
 import PerfectThread
 
-public class MySQLConnectionPool {
-	public static let sharedInstance = MySQLConnectionPool()
+public class ConnectionPool {
+	public static let sharedInstance = ConnectionPool()
 
 	// Connection settings
 	private var host:String = "", user:String = "", pass:String = ""
@@ -49,7 +49,9 @@ public class MySQLConnectionPool {
 		let timeStartWaiting = Date()
 
 		// Wait until we have a connection or throw timeout.
-		while Int(timeStartWaiting.timeIntervalSinceNow) < -getTimeout {
+		print(Int(timeStartWaiting.timeIntervalSinceNow))
+		print(-getTimeout)
+		while Int(timeStartWaiting.timeIntervalSinceNow) > -getTimeout {
 			if let conn = lockAndGetConnection() {
 				if conn.getLastError().errorCode == 0 {
 					return conn
