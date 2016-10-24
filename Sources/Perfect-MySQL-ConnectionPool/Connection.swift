@@ -38,12 +38,14 @@ public class Connection: Equatable {
 	}
 
 	public func returnToPool() {
+		print("return to pool")
 		ConnectionPool.sharedInstance.returnConnection(conn: self)
 	}
 
 	deinit {
 		print("DEINIT")
 		mysql.close()
+		//ConnectionPool.sharedInstance.removeConnection(conn: self)
 	}
 
 
@@ -100,7 +102,6 @@ public class Connection: Equatable {
 			lastError = (Int(mysql.errorCode()), "Cannot create query  \(mysql.errorCode()) \(mysql.errorMessage())")
 			throw ConnectionError.errorPrepareQuery(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
-
 		return nil
 	}
 
@@ -151,10 +152,13 @@ public class Connection: Equatable {
 			lastError = (Int(mysql.errorCode()), "Cannot create query  \(mysql.errorCode()) \(mysql.errorMessage())")
 			throw ConnectionError.errorPrepareQuery(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
+
 	}
 
 	public func queryAll(_ query:String, args:Any..., closure: (_ row:  Array<Optional<Any>>)->()) throws {
 		resetError()
+
+		print("queryAll \(self.idConnection)")
 
 		let stmt:MySQLStmt = MySQLStmt(mysql)
 		defer { stmt.close() }
@@ -176,12 +180,19 @@ public class Connection: Equatable {
 
 			closure(row)
 		}
+		print("queryAll end \(self.idConnection)")
+
 	}
 
 	public func execute(_ query:String) throws {
 		if !mysql.query(statement: query) {
 			lastError = (Int(mysql.errorCode()), "Cannot create query  \(mysql.errorCode()) \(mysql.errorMessage())")
 			throw ConnectionError.errorPrepareQuery(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+
+		// Free any result other wise it failt with error 2014 : Commands out of sync
+		if let results = mysql.storeResults() {
+			results.close()
 		}
 	}
 
@@ -201,6 +212,11 @@ public class Connection: Equatable {
 
 		if !stmt.execute() {
 			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+
+		// Free any result other wise it failt with error 2014 : Commands out of sync
+		if let results = mysql.storeResults() {
+			results.close()
 		}
 	}
 

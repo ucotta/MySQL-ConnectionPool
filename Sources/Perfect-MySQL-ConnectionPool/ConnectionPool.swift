@@ -91,6 +91,15 @@ public class ConnectionPool {
 		return nil
 	}
 
+	public func removeConnection(conn:Connection) {
+		lock.lock()
+		defer { lock.unlock() }
+
+		if let p = activeConnections.index(of: conn) {
+			activeConnections.remove(at: p)
+			totalConnections -= 1
+		}
+	}
 
 	public func returnConnection(conn:Connection) {
 		lock.lock()
@@ -103,13 +112,15 @@ public class ConnectionPool {
 		// the connection will be release in Connection.deinit.
 		if inactiveConnections.count < maxIdle {
 			inactiveConnections.insert(conn, at: 0)
+		} else {
+			totalConnections -= 1
 		}
 
 	}
 
 	private func isAlive(conn:Connection) -> Bool {
 		do {
-			try conn.mysql.serverVersion()
+			try conn.execute("SELECT now()")
 		} catch {
 			return false
 		}
