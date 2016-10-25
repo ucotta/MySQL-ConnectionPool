@@ -1,7 +1,7 @@
 import PackageDescription
 
 
-let urls = ["https://github.com/PerfectlySoft/Perfect-Thread.git"]
+var urls = ["https://github.com/PerfectlySoft/Perfect-Thread.git"]
 
 #if os(OSX)
 urls.append("https://github.com/PerfectlySoft/Perfect-mysqlclient.git")
