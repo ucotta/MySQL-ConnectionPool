@@ -1,14 +1,10 @@
 import PackageDescription
 
 
-var urls = ["https://github.com/PerfectlySoft/Perfect-Thread.git"]
-
-#if os(OSX)
-urls.append("https://github.com/PerfectlySoft/Perfect-mysqlclient.git")
-#else
-urls.append("https://github.com/PerfectlySoft/Perfect-mysqlclient-Linux.git")
-#endif
-
+var urls = [
+	"https://github.com/PerfectlySoft/Perfect-Thread.git", 
+	"https://github.com/PerfectlySoft/Perfect-MySQL.git"
+]
 
 let package = Package(
 	name: "MySQLConnectionPool",
