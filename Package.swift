@@ -11,7 +11,7 @@ urls.append("https://github.com/PerfectlySoft/Perfect-mysqlclient-Linux.git")
 
 
 let package = Package(
-	name: "PerfectMySQLConnectionPool",
+	name: "MySQLConnectionPool",
 	targets: [],
 	dependencies: urls.map { .Package(url: $0, majorVersion: 2, minor: 0) },
 	exclude: []
