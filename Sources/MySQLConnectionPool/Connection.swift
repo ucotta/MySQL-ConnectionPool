@@ -69,8 +69,11 @@ public class Connection: Equatable {
 				stmt.bindParam(val)
 			case let val as String:
 				stmt.bindParam(val)
-				//case let val as Date:
-				//	stmt.bindParam(fromDateTime: val)
+			case let val as Date:
+				// Dateformatter use localtime.
+				let formatter = DateFormatter()
+				formatter.dateFormat = "YYY-MM-dd hh:mm:ss"
+				stmt.bindParam(formatter.string(from: val))
 				//case let val as Time:
 				//    stmt.bindParam(fromTime: val)
 				//case let val as DateTime:
@@ -105,7 +108,7 @@ public class Connection: Equatable {
 		return nil
 	}
 
-	public func queryRow(_ query: String, args: Any...) throws -> Array<Optional<Any>>? {
+	public func queryRow(_ query: String, args: Any...) throws -> [Any?]? {
 		resetError()
 
 		let stmt:MySQLStmt = MySQLStmt(mysql)
@@ -134,7 +137,7 @@ public class Connection: Equatable {
 			}
 		}
 
-		return result
+		return result.isEmpty ? nil : result
 	}
 
 	public func queryAll(_ query:String, closure: (_ row:  Array<Optional<Any>>)->()) throws {
