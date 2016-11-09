@@ -30,7 +30,7 @@ public class Connection: Equatable {
 				return
 			}
 		}
-		print("INIT")
+		//print("INIT")
 	}
 
 	public func close() {
@@ -38,12 +38,12 @@ public class Connection: Equatable {
 	}
 
 	public func returnToPool() {
-		print("return to pool")
+		//print("return to pool")
 		ConnectionPool.sharedInstance.returnConnection(conn: self)
 	}
 
 	deinit {
-		print("DEINIT")
+		//print("DEINIT")
 		mysql.close()
 		//ConnectionPool.sharedInstance.removeConnection(conn: self)
 	}
@@ -161,7 +161,7 @@ public class Connection: Equatable {
 	public func queryAll(_ query:String, args:Any..., closure: (_ row:  Array<Optional<Any>>)->()) throws {
 		resetError()
 
-		print("queryAll \(self.idConnection)")
+		//print("queryAll \(self.idConnection)")
 
 		let stmt:MySQLStmt = MySQLStmt(mysql)
 		defer { stmt.close() }
@@ -183,7 +183,7 @@ public class Connection: Equatable {
 
 			closure(row)
 		}
-		print("queryAll end \(self.idConnection)")
+		//print("queryAll end \(self.idConnection)")
 
 	}
 
