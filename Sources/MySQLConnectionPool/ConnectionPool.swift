@@ -49,8 +49,8 @@ public class ConnectionPool {
 		let timeStartWaiting = Date()
 
 		// Wait until we have a connection or throw timeout.
-		print(Int(timeStartWaiting.timeIntervalSinceNow))
-		print(-getTimeout)
+		//print(Int(timeStartWaiting.timeIntervalSinceNow))
+		//print(-getTimeout)
 		while Int(timeStartWaiting.timeIntervalSinceNow) > -getTimeout {
 			if let conn = lockAndGetConnection() {
 				if conn.getLastError().errorCode == 0 {
