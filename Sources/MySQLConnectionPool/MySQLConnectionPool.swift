@@ -9,7 +9,7 @@ import Foundation
 import MySQL
 import PerfectThread
 
-public class ConnectionPool {
+public class MySQLConnectionPool {
 	public static let sharedInstance = ConnectionPool()
 
 	// Connection settings
