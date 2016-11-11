@@ -10,7 +10,7 @@ import Foundation
 import MySQL
 
 public class Connection: Equatable {
-	private var lastError = (0, "")
+	private var _lastError = (0, "")
 	public let mysql:MySQL
 	private let idConnection:Int
 
@@ -39,7 +39,7 @@ public class Connection: Equatable {
 
 	public func returnToPool() {
 		//print("return to pool")
-		ConnectionPool.sharedInstance.returnConnection(conn: self)
+		MySQLConnectionPool.sharedInstance.returnConnection(conn: self)
 	}
 
 	deinit {
@@ -53,9 +53,14 @@ public class Connection: Equatable {
 		return left.idConnection == right.idConnection
 	}
 
-	public func getLastError() -> (errorCode:Int, errorMessage:String) {
-		return lastError
-	}
+    public var lastError: (errorCode:Int, errorMessage:String) {
+        get {
+            return self._lastError
+        }
+        set {
+            _lastError = newValue
+        }
+    }
 
 	private func addParams(_ stmt: MySQLStmt, args:[Any]) throws {
 		var i = 0

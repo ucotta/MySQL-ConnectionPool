@@ -10,7 +10,7 @@ import MySQL
 import PerfectThread
 
 public class MySQLConnectionPool {
-	public static let sharedInstance = ConnectionPool()
+	public static let sharedInstance = MySQLConnectionPool()
 
 	// Connection settings
 	private var host:String = "", user:String = "", pass:String = ""
@@ -53,11 +53,11 @@ public class MySQLConnectionPool {
 		//print(-getTimeout)
 		while Int(timeStartWaiting.timeIntervalSinceNow) > -getTimeout {
 			if let conn = lockAndGetConnection() {
-				if conn.getLastError().errorCode == 0 {
+				if conn.lastError.errorCode == 0 {
 					return conn
 				}
 				// The connection will released in Connection.deinit
-				throw ConnectionPoolError.errorConnecting(errorCode: conn.getLastError().errorCode, message: conn.getLastError().errorMessage)
+				throw ConnectionPoolError.errorConnecting(errorCode: conn.lastError.errorCode, message: conn.lastError.errorMessage)
 			}
 			Threading.sleep(seconds: 0.50)
 		}
@@ -82,7 +82,7 @@ public class MySQLConnectionPool {
 			let conn:Connection = Connection(lastConnectionId, host: host, port: port, user: user, pass: pass, scheme: scheme)
 
 			// Failed connections are discarted later
-			if conn.getLastError().errorCode == 0 {
+			if conn.lastError.errorCode == 0 {
 				activeConnections.append(conn)
 				self.totalConnections += 1
 			}
