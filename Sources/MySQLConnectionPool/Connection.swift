@@ -163,7 +163,7 @@ public class Connection: Equatable {
 
 	}
 
-	public func queryAll(_ query:String, args:Any..., closure: (_ row:  Array<Optional<Any>>)->()) throws {
+	public func queryAll(_ query:String, args:Any..., closure: (_ row: [String: Any?])->()) throws {
 		resetError()
 
 		//print("queryAll \(self.idConnection)")
@@ -178,6 +178,13 @@ public class Connection: Equatable {
 
 		try addParams(stmt, args: args)
 
+        var keys = [String]()
+        for index in 0..<Int(stmt.fieldCount()) {
+            let fieldInfo = stmt.fieldInfo(index: index)
+            keys.append(fieldInfo?.name ?? "?")
+        }
+        
+        
 		if !stmt.execute() {
 			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
@@ -185,8 +192,13 @@ public class Connection: Equatable {
 		defer { stmt.freeResult() }
 
 		_ = datos.forEachRow { row in
+            var dic = [String: Any?]()
+            
+            for (key, value) in zip(keys, row) {
+                dic[key] = value
+            }
 
-			closure(row)
+			closure(dic)
 		}
 		//print("queryAll end \(self.idConnection)")
 
