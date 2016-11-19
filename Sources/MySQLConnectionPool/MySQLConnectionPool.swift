@@ -17,7 +17,7 @@ public class MySQLConnectionPool {
 	private var port:Int = 3306, scheme:String?, database:String?
 
 	// Pool management settins and max wait until throw an exception for timeout.
-	private var initialSize = 2, maxActive = 10, maxIdle = 4, getTimeout = 20
+	private var initialSize = 2, maxActive = 20, maxIdle = 4, getTimeout = 5
 
 	// Pool data
 	private var totalConnections = 0
@@ -59,6 +59,7 @@ public class MySQLConnectionPool {
 			}
 			Threading.sleep(seconds: 0.50)
 		}
+		print("timeout getconnnection")
 		throw ConnectionPoolError.timeoutWaitingForFreeConnections
 	}
 
@@ -113,7 +114,6 @@ public class MySQLConnectionPool {
 		} else {
 			totalConnections -= 1
 		}
-
 	}
 
 	private func isAlive(conn:Connection) -> Bool {

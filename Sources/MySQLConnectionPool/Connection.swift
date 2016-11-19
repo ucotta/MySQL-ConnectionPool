@@ -9,14 +9,32 @@
 import Foundation
 import MySQL
 
+private class PreparedStatementResult {
+	let stmt: MySQLStmt
+	let fields: [String]
+	let results: MySQLStmt.Results
+	
+	init(stmt: MySQLStmt, fields: [String]) {
+		self.stmt = stmt
+		self.fields = fields
+		self.results = stmt.results()
+	}
+	
+	deinit {
+		stmt.freeResult()
+		stmt.close()
+	}
+}
+
 public class Connection: Equatable {
 	private var _lastError = (0, "")
 	public let mysql:MySQL
-	private let idConnection:Int
+	public let idConnection:Int
 
 	public init(_ idConnection:Int = -1, host:String, port:Int, user:String, pass:String, scheme:String?) {
 		self.idConnection = idConnection
 		mysql = MySQL()
+        _ = mysql.setOption(.MYSQL_SET_CHARSET_NAME, "utf8")
 
 		guard mysql.connect(host: host, user: user, password: pass, port: UInt32(port)) else {
 			lastError = (Int(mysql.errorCode()), "Can not connect  \(mysql.errorCode()) \(mysql.errorMessage())")
@@ -37,10 +55,12 @@ public class Connection: Equatable {
 	}
 
 	public func returnToPool() {
+		//print("return to pool \(idConnection)")
 		MySQLConnectionPool.sharedInstance.returnConnection(conn: self)
 	}
 
 	deinit {
+		//print("DEINIT connection \(idConnection)")
 		mysql.close()
 	}
 
@@ -93,16 +113,19 @@ public class Connection: Equatable {
 	private func resetError() {
 		lastError = (0, "")
 	}
-
-	public func queryRow(_ query: String) throws -> [String: Any?]? {
-		resetError()
+	
+	private func prepareStatement(_ query:String, args: [Any?]?) throws -> PreparedStatementResult {
+		lastError = (0, "")
 		
 		let stmt:MySQLStmt = MySQLStmt(mysql)
-		defer { stmt.close() }
 		
 		guard stmt.prepare(statement: query) else {
-			lastError = (Int(stmt.errorCode()), "Cannot create statement  \(stmt.errorCode()) \(stmt.errorMessage())")
+			lastError = (Int(stmt.errorCode()), "Cannot create statement \(stmt.errorCode()) \(stmt.errorMessage())")
 			throw ConnectionError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+
+		if let parameters = args {
+			try addParams(stmt, args: parameters)
 		}
 		
 		var keys = [String]()
@@ -112,66 +135,75 @@ public class Connection: Equatable {
 		}
 		
 		if !stmt.execute() {
-			lastError = (Int(stmt.errorCode()), "Cannot execute statement  \(stmt.errorCode()) \(stmt.errorMessage())")
 			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
-		let datos = stmt.results()
-		defer { stmt.freeResult() }
-		
-		var result:[String: Any?] = [:]
-		
-		_ = datos.forEachRow { row in
-			// return just the first record.
-			if result.isEmpty {
-				for (key, value) in zip(keys, row) {
-					result[key] = value
-				}
-			}
+		return PreparedStatementResult(stmt: stmt, fields: keys)
+	}
+
+    /*
+	public func queryRow(_ query: String) throws -> [String: Any?]? {
+		guard mysql.query(statement: query) else {
+			return nil
+
 		}
-		
-		return result.isEmpty ? nil : result	}
+
+		//store complete result set
+		let storeResults = dataMysql.storeResults()
+		var result:[String: Any?] = [:]
+
+		if let row = storeResults?.next() {
+			for (key, value) in zip(stmt.fields, row) {
+				result[key] = correctData(data: value)
+			}
+			return result
+		}
+
+		return nil
+	}
+	*/
+
+	private func correctData(data: Any?) -> Any? {
+        guard data != nil else {
+            return data
+        }
+		if data! is [UInt8] {
+			return String(bytes: data as! [UInt8], encoding: String.Encoding.utf8)
+		}
+		return data
+	}
 
 
 	public func queryRow(_ query: String, args: Any...) throws -> [String: Any?]? {
-		resetError()
-
-		let stmt:MySQLStmt = MySQLStmt(mysql)
-		defer { stmt.close() }
-
-		guard stmt.prepare(statement: query) else {
-			lastError = (Int(stmt.errorCode()), "Cannot create statement  \(stmt.errorCode()) \(stmt.errorMessage())")
-			throw ConnectionError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
-		}
-
-		try addParams(stmt, args: args)
-
-		var keys = [String]()
-		for index in 0..<Int(stmt.fieldCount()) {
-			let fieldInfo = stmt.fieldInfo(index: index)
-			keys.append(fieldInfo?.name ?? "?")
-		}
-		
-		if !stmt.execute() {
-			lastError = (Int(stmt.errorCode()), "Cannot execute statement  \(stmt.errorCode()) \(stmt.errorMessage())")
-			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
-		}
-		let datos = stmt.results()
-		defer { stmt.freeResult() }
+		let stmt = try prepareStatement(query, args: args)
 		
 		var result:[String: Any?] = [:]
 		
-		_ = datos.forEachRow { row in
+		_ = stmt.results.forEachRow { row in
 			// return just the first record.
 			if result.isEmpty {
-				for (key, value) in zip(keys, row) {
-					result[key] = value
+				for (key, value) in zip(stmt.fields, row) {
+					result[key] = correctData(data: value)
 				}
 			}
 		}
-		
 		return result.isEmpty ? nil : result
 	}
 	
+
+	public func queryAll(_ query:String) throws -> [[String: Any?]] {
+		let stmt = try prepareStatement(query, args: nil)
+		
+		var result:[[String: Any?]] = []
+		
+		_ = stmt.results.forEachRow { row in
+			var dic = [String: Any?]()
+			for (key, value) in zip(stmt.fields, row) {
+				dic[key] = correctData(data: value)
+			}
+			result.append(dic)
+		}
+		return result
+	}
 	
 	public func queryAll(_ query:String, closure: (_ row: [String: Any?])->()) throws {
 		resetError()
@@ -201,7 +233,7 @@ public class Connection: Equatable {
 			var dic = [String: Any?]()
 			
 			for (key, value) in zip(keys, row) {
-				dic[key] = value
+				dic[key] = correctData(data: value)
 			}
 			
 			closure(dic)
@@ -238,7 +270,7 @@ public class Connection: Equatable {
             var dic = [String: Any?]()
             
             for (key, value) in zip(keys, row) {
-                dic[key] = value
+                dic[key] = correctData(data: value)
             }
 
 			closure(dic)
