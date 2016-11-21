@@ -18,5 +18,6 @@ public enum ConnectionError : Error {
 	case errorPrepareQuery(errorCode: Int, errorMessage: String)
 	case errorExecute(errorCode: Int, errorMessage: String)
 
+	case resultNotContainsCountKey
+	case fieldNotFound(field:String, in:String)
 }
-

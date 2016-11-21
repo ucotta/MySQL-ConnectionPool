@@ -9,6 +9,8 @@
 import Foundation
 import MySQL
 
+
+
 private class PreparedStatementResult {
 	let stmt: MySQLStmt
 	let fields: [String]
@@ -314,6 +316,145 @@ public class Connection: Equatable {
 		}
 	}
 
+	public func getCount(sql: String) throws -> UInt {
+		resetError()
+		guard mysql.query(statement: sql) else {
+			lastError = (Int(mysql.errorCode()), "Cannot execute query \(mysql.errorCode()) \(mysql.errorMessage())")
+			throw ConnectionError.errorPrepareQuery(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
 
+		let results = mysql.storeResults()
+		defer {results?.close() }
+		while let row = results?.next() {
+			return UInt(row[0]!)!
+		}
+
+		throw ConnectionError.resultNotContainsCountKey
+
+		/*
+
+		let obj = try queryRow(sql)
+		guard obj != nil, obj!["count"] != nil else {
+			throw ConnectionError.resultNotContainsCountKey
+		}
+		let r = obj!["count"]! as! Int64
+		return Int32(r)
+		*/
+	}
+
+
+	public func insert(table: String, fields includeFields: String, args: [(String, String)]) throws -> UInt {
+		lastError = (0, "")
+		var items: [String: String] = [:]
+		for (key, value) in args {
+			items[key] = value
+		}
+
+		var fields: [String: String] = [:]
+		for item in try queryAll("describe \(table)") {
+			fields[item["Field"] as! String] = item["Type"] as! String?
+		}
+
+		var query = "INSERT INTO \(table) "
+		var questions = ""
+		var values: [Any] = []
+
+
+		// Prepare the list of parameters and theirs values
+		var comma = false
+		for field in includeFields.components(separatedBy: ",") {
+			guard let description = fields[field] else {
+				throw ConnectionError.fieldNotFound(field: field, in: table)
+			}
+
+			questions += comma ? ", " : ""
+			questions += "?"
+			comma = true
+
+			if description.contains("int") || description.contains("double") {
+				values.append(items[field] ?? "0")
+			} else {
+				values.append(items[field] ?? "")
+			}
+		}
+
+		query += " (\(includeFields)) VALUES (\(questions)) "
+
+		let stmt:MySQLStmt = MySQLStmt(mysql)
+		defer { stmt.close() }
+
+		guard stmt.prepare(statement: query) else {
+			lastError = (Int(stmt.errorCode()), "Cannot create statement \(stmt.errorCode()) \(stmt.errorMessage())")
+			throw ConnectionError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+
+		try addParams(stmt, args: values)
+
+		if !stmt.execute() {
+			throw ConnectionError.errorExecute(errorCode: Int(stmt.errorCode()), errorMessage: stmt.errorMessage())
+		}
+
+		// Free any result other wise it fail with error 2014 : Commands out of sync
+		if let results = mysql.storeResults() {
+			results.close()
+		}
+		return stmt.insertId()
+	}
+
+	public func update(table: String, id: Int, fields includeFields: String, args: [(String, String)]) throws {
+		lastError = (0, "")
+
+		var items: [String: String] = [:]
+		for (key, value) in args {
+			items[key] = value
+		}
+
+		var fields: [String: String] = [:]
+		for item in try queryAll("describe \(table)") {
+			fields[item["Field"] as! String] = item["Type"] as! String?
+		}
+
+		var query = "UPDATE \(table) SET "
+		var values: [Any] = []
+
+		// Prepare the list of parameters and theirs values
+		var comma = false
+		for field in includeFields.components(separatedBy: ",") {
+			guard let description = fields[field] else {
+				throw ConnectionError.fieldNotFound(field: field, in: table)
+			}
+
+			query += comma ? ", " : ""
+			query += "\(field) = ?"
+			comma = true
+
+			if description.contains("int") {
+				values.append(items[field] ?? "0")
+			} else {
+				values.append(items[field] ?? "")
+			}
+		}
+
+		query += " WHERE id=\(id)"
+
+		let stmt:MySQLStmt = MySQLStmt(mysql)
+		defer { stmt.close() }
+
+		guard stmt.prepare(statement: query) else {
+			lastError = (Int(stmt.errorCode()), "Cannot create statement \(stmt.errorCode()) \(stmt.errorMessage())")
+			throw ConnectionError.errorPrepareStatement(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+
+		try addParams(stmt, args: values)
+
+		if !stmt.execute() {
+			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
+		}
+
+		// Free any result other wise it failt with error 2014 : Commands out of sync
+		if let results = mysql.storeResults() {
+			results.close()
+		}
+	}
 }
 
