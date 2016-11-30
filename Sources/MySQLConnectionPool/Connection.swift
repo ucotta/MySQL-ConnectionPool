@@ -401,7 +401,7 @@ public class Connection: Equatable {
 		return stmt.insertId()
 	}
 
-	public func update(table: String, id: Int, fields includeFields: String, args: [(String, String)]) throws {
+	public func update(table: String, id: UInt, fields includeFields: String, args: [(String, String)]) throws {
 		lastError = (0, "")
 
 		var items: [String: String] = [:]
