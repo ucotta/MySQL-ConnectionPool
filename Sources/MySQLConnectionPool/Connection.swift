@@ -343,6 +343,7 @@ public class Connection: Equatable {
 	}
 
 
+	
 	public func insert(table: String, fields includeFields: String, args: [(String, String)]) throws -> UInt {
 		lastError = (0, "")
 		var items: [String: String] = [:]
