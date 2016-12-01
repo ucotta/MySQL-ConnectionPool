@@ -75,7 +75,7 @@ public class MySQLConnectionPool {
 			}
 			return nil
 		}
-		if totalConnections < maxActive {
+		if totalConnections < maxActive || initialSize == -1 {
 			// Create a new connection
 			lastConnectionId += 1
 			let conn:Connection = Connection(lastConnectionId, host: host, port: port, user: user, pass: pass, scheme: scheme)
@@ -89,6 +89,7 @@ public class MySQLConnectionPool {
 		}
 		return nil
 	}
+	
 
 	public func removeConnection(conn:Connection) {
 		lock.lock()
@@ -103,6 +104,12 @@ public class MySQLConnectionPool {
 	public func returnConnection(conn:Connection) {
 		lock.lock()
 		defer { lock.unlock() }
+		
+		// No pool system enabled
+		if initialSize == -1 {
+			conn.close()
+			return
+		}
 
 		if let p = activeConnections.index(of: conn) {
 			activeConnections.remove(at: p)
