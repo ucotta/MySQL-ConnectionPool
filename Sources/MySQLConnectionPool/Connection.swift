@@ -341,16 +341,18 @@ public class Connection: Equatable {
 		return Int32(r)
 		*/
 	}
-
-
+	
 	
 	public func insert(table: String, fields includeFields: String, args: [(String, String)]) throws -> UInt {
-		lastError = (0, "")
 		var items: [String: String] = [:]
 		for (key, value) in args {
 			items[key] = value
 		}
-
+		return try insert(table: table, fields: includeFields, items: items)
+	}
+	public func insert(table: String, fields includeFields: String, items: [String: String?]) throws -> UInt {
+		lastError = (0, "")
+		
 		var fields: [String: String] = [:]
 		for item in try queryAll("describe \(table)") {
 			fields[item["Field"] as! String] = item["Type"] as! String?
@@ -403,12 +405,14 @@ public class Connection: Equatable {
 	}
 
 	public func update(table: String, id: UInt, fields includeFields: String, args: [(String, String)]) throws {
-		lastError = (0, "")
-
 		var items: [String: String] = [:]
 		for (key, value) in args {
 			items[key] = value
 		}
+		return try update(table: table, id: id, fields: includeFields, items: items)
+	}
+	public func update(table: String, id: UInt, fields includeFields: String, items: [String: String?]) throws {
+		lastError = (0, "")
 
 		var fields: [String: String] = [:]
 		for item in try queryAll("describe \(table)") {
@@ -425,6 +429,10 @@ public class Connection: Equatable {
 				throw ConnectionError.fieldNotFound(field: field, in: table)
 			}
 
+			if items[field] == nil || items[field]! == nil {
+				// Nil fields are ignored by default.
+				continue
+			}
 			query += comma ? ", " : ""
 			query += "\(field) = ?"
 			comma = true
