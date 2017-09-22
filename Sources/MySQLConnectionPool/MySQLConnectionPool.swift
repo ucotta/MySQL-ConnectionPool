@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import MySQL
+import PerfectMySQL
 import PerfectThread
 
 public class MySQLConnectionPool {
