@@ -36,7 +36,7 @@ public class Connection: Equatable {
 	public init(_ idConnection:Int = -1, host:String, port:Int, user:String, pass:String, scheme:String?) {
 		self.idConnection = idConnection
 		mysql = MySQL()
-        _ = mysql.setOption(.MYSQL_SET_CHARSET_NAME, "utf8")
+		_ = mysql.setOption(.MYSQL_SET_CHARSET_NAME, "utf8")
 
 		guard mysql.connect(host: host, user: user, password: pass, port: UInt32(port)) else {
 			lastError = (Int(mysql.errorCode()), "Can not connect  \(mysql.errorCode()) \(mysql.errorMessage())")
@@ -71,19 +71,21 @@ public class Connection: Equatable {
 		return left.idConnection == right.idConnection
 	}
 
-    public var lastError: (errorCode:Int, errorMessage:String) {
-        get {
-            return self._lastError
-        }
-        set {
-            _lastError = newValue
-        }
-    }
+	public var lastError: (errorCode:Int, errorMessage:String) {
+		get {
+			return self._lastError
+		}
+		set {
+			_lastError = newValue
+		}
+	}
 
 	private func addParams(_ stmt: MySQLStmt, args:[Any]) throws {
 		var i = 0
 		for item in args {
 			switch item {
+			case let val as UInt:
+				stmt.bindParam(UInt64(val))
 			case let val as Int:
 				stmt.bindParam(val)
 			case let val as UInt64:
@@ -165,11 +167,26 @@ public class Connection: Equatable {
 	*/
 
 	private func correctData(data: Any?) -> Any? {
-        guard data != nil else {
-            return data
-        }
-		if data! is [UInt8] {
-			return String(bytes: data as! [UInt8], encoding: String.Encoding.utf8)
+		guard data != nil else {
+			return data
+		}
+		switch data! {
+			case is [UInt8]:
+				return String(bytes: data as! [UInt8], encoding: String.Encoding.utf8)
+			case is UInt64:
+				return UInt(data as! UInt64)
+			case is UInt32:
+				return UInt(data as! UInt32)
+			case is UInt16:
+				return UInt(data as! UInt16)
+			case is Int64:
+				return UInt(data as! Int64)
+			case is Int32:
+				return Int(data as! Int32)
+			case is Int16:
+				return Int(data as! Int16)
+			default:
+				return data
 		}
 		return data
 	}
@@ -254,27 +271,26 @@ public class Connection: Equatable {
 		}
 
 		try addParams(stmt, args: args)
-
-        var keys = [String]()
-        for index in 0..<Int(stmt.fieldCount()) {
-            let fieldInfo = stmt.fieldInfo(index: index)
-            keys.append(fieldInfo?.name ?? "?")
-        }
-        
-        
+		
+		var keys = [String]()
+		for index in 0..<Int(stmt.fieldCount()) {
+			let fieldInfo = stmt.fieldInfo(index: index)
+			keys.append(fieldInfo?.name ?? "?")
+		}
+                
 		if !stmt.execute() {
 			throw ConnectionError.errorExecute(errorCode: Int(mysql.errorCode()), errorMessage: mysql.errorMessage())
 		}
+		
 		let datos = stmt.results()
 		defer { stmt.freeResult() }
 
 		_ = datos.forEachRow { row in
-            var dic = [String: Any?]()
-            
-            for (key, value) in zip(keys, row) {
-                dic[key] = correctData(data: value)
-            }
-
+				var dic = [String: Any?]()
+				
+				for (key, value) in zip(keys, row) {
+					dic[key] = correctData(data: value)
+				}
 			closure(dic)
 		}
 	}
